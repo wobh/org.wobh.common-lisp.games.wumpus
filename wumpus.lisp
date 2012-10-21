@@ -677,8 +677,8 @@ a hunter location as its last value."
 
 (defun wumpus-bothered (hunt)
   (let ((chance (hunt-random 4)))
-    (cond ((= chance 3)
-	   (wumpus-wanders hunt)))))
+    (unless (= chance 3)
+      (wumpus-wanders hunt))))
 
 (defun wake-wumpus (cause hunt)
   (record-event 'wumpus-wakes hunt)
