@@ -1,0 +1,152 @@
+#+TITLE:     Wumpus for Common Lisp
+#+AUTHOR:    William Clifford
+#+EMAIL:     wobh@yahoo.com
+#+DATE:      2012-10-27 Sat
+#+DESCRIPTION: documentation and plan for a Common Lisp Wumpus Game
+#+KEYWORDS: 
+#+LANGUAGE:  en
+#+OPTIONS:   H:3 num:t toc:t \n:nil @:t ::t |:t ^:t -:t f:t *:t <:t
+#+OPTIONS:   TeX:t LaTeX:t skip:nil d:nil todo:t pri:nil tags:not-in-toc
+#+INFOJS_OPT: view:nil toc:nil ltoc:t mouse:underline buttons:0 path:http://orgmode.org/org-info.js
+#+EXPORT_SELECT_TAGS: export
+#+EXPORT_EXCLUDE_TAGS: noexport
+#+LINK_UP:   
+#+LINK_HOME: 
+#+XSLT:
+
+* Introduction
+
+Gregory Yob made the following suggestions to expand his original
+_Hunt the Wumpus_ game.
+
+"If you are a Wumpus fiend, make a version in which he avoids
+pits and superbats can carry him only one room (with the
+possibility of being dumped into your cave)." [[[1]]]
+
+[[http://www.atariarchives.org/bcc1/showpage.php?page%3D248][http://www.atariarchives.org/bcc1/showpage.php?page=248]]
+
+Yob added different cave systems in _Wumpus 2_ and discussed
+additional features in _Wumpus 3_.
+
+"... earthquakes, bat migrations, and the incredible
+'turnareo' ..." [[[2]]]
+
+http://www.atariarchives.org/bcc2/showpage.php?page=244
+
+So the idea here is to make a _Hunt the Wumpus_ for Common Lisp, which
+allows the classic _Hunt the Wumpus_ and _Wumpus 2_ games. I couldn't
+find source for _Wumpus 3_, but I thought I should set it up to easily
+allow adapting and modifying the game.
+
+** New Features
+
+It might take more than one arrow to slay the Wumpus (or the
+Hunter). The Hunter might be able to survive a Wumpus mauling.
+
+If the arrow strikes the Wumpus and the Wumpus survives, the
+Wumpus might be able to track the arrow to the room it came
+from. If the hunter or other scapegoat is not found, the still
+enraged Wumpus might make one further move at random. This would
+force the hunter to shoot from a couple of rooms away to be safe.
+
+** Features to consider
+
+Bats might move around.
+
+How do arrows interact with pits or bats?
+
+Wounded Wumpuses and Hunters might heal (perhaps by eating mushrooms, or drinking mineral water).
+
+The Wumpus might wake and move around before settling down
+again. (hunter-makes-noise?)
+
+The Wumpus might track the Hunter through the caves.
+
+* Exported functions and their parameters
+
+** MAIN
+
+Launches game, defaults to classic Hunt the Wumpus settings.
+
+*** :GAME
+
+Option to provide custom Hunt the Wumpus game environment
+
+** SETUP-GAME
+
+Creates Hunt the Wumpus game environment
+
+*** :HUNT
+
+Option for providing a custom hunting setting.
+
+*** :ALLOW-QUIT
+
+When true, allows player to quit game at action prompt.
+
+*** :CANCEL-SHOT-WITH-ZERO
+
+When true, allows hunter to cancel shot by entering '0' at shot range
+prompt.
+
+*** :SHOW-NEAR-CHAMBERS
+
+When true, shows the player the nearby chambers to the last room in
+arrow path. This makes accurately steering an arrow shot path a lot
+easier.
+
+
+** SETUP-HUNT
+
+*** :CAVE-NAME
+
+Option to provide a cave name for custom cave. The cave names
+
+- DODECAHEDRON :: Classic Wumpus cave. Default cave.
+- DODECAHEDRON-CIRCUIT :: dodecahedron with Hamiltonian circuit
+                          passages
+- MOBIUS-STRIP :: From Wumpus II
+- STRING-OF-BEADS :: From Wumpus II
+- HEX-NET-ON-TORUS :: From Wumpus II
+- DENDRITE-WITH-DEGENERACIES :: From Wumpus II
+- ONE-WAY-LATTICE :: From Wumpus II
+
+*** :WUMPUS-HEALTH
+
+Option for allowing the Wumpus to take more than one arrow
+hit. Default, 1.
+
+*** :WUMPUS-HURT
+
+Symbol of function which governs what the wumpus does when struck by an arrow and not slain.
+
+- WUMPUS-BOTHERED :: will randomly move or stay
+- WUMPUS-ENRAGED :: will try to follow the arrow into the room it came from, and beyond if no one found
+
+*** :HUNTER-HEALTH
+
+Option for allowing the Hunter to survive more than one wumpus
+mauling. Default 1.
+
+*** :BOW-RANGE-MAXIMUM
+
+Option for setting the maximum range of the Hunter's bow. Default
+5.
+
+*** :QUIVER-ROOM
+
+Option for setting the maximum number of arrows the Hunter's quiver
+can hold. Default 5.
+
+*** :QUIVER-HOLD
+
+Option for setting the number of arrows the Hunter's quiver starts off
+with. Default 5.
+
+* References
+
+<<1>> Yob, Gregory, _Hunt The Wumpus_, _The Best Of Creative Computing Volume 1_, 1976, pgs 247-250, http://www.atariarchives.org/bcc1/showpage.php?page=247
+
+<<2>>Yob, Gregory, _Wumpus 2_, _The Best Of Creative Computing Volume 2_, 1977, pgs 244-246, http://www.atariarchives.org/bcc2/showpage.php?page=244
+
+<<3>> _Baf's guide to the IF Archive_, http://www.wurb.com/if/game/442
