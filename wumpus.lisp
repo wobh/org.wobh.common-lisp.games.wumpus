@@ -3,7 +3,7 @@
 
 ;;;; DESCRIPTION
 
-;;;; Common Lisp version of Gregory Yob's classic game
+;;;; A Common Lisp version of Gregory Yob's classic game
 
 ;;;; AUTHORS
 
@@ -30,6 +30,8 @@
 
 Summary of symbols exported. See README.org for more information.
 
+** Game setup functions
+
 - main :: Launches game, defaults to classic Hunt the Wumpus settings.
 - setup-game :: Creates Hunt the Wumpus game environment
 - setup-hunt :: Creates Hunting environment, cave, wumpus, and hunter qualities
@@ -48,9 +50,7 @@ Summary of symbols exported. See README.org for more information.
 - string-of-beads
 - hex-net-on-torus
 - dendrite-with-degeneracies
-- one-way-lattice
-
-"))
+- one-way-lattice"))
 
 
 (in-package "ORG.WOBH.WUMPUS")
@@ -81,36 +81,73 @@ Summary of symbols exported. See README.org for more information.
 ;;;;; The Hunt
 
 (defparameter *hunt-events*
-  '(hunter-moves
-    hunter-slain
-    hunter-enters-cave
-    hunter-enters-chamber ; necessary?
-    hunter-senses-chamber ; hunter-senses-danger, hunter-uses-senses
-    hunter-hears-bats
-    bats-carry-hunter
-    hunter-smells-wumpus
-    hunter-feels-draft
-    hunter-falls-in-pit
-    hunter-bumps-wumpus
-    hunter-shoots-arrow
-    arrow-strikes-ground
-    arrow-falls-in-pit
-    arrow-strikes-hunter
-    arrow-strikes-wumpus
-    wumpus-wakes
-    wumpus-moves
-    wumpus-rests
-    wumpus-slain
-    wumpus-mauls-hunter
-    player-quits-game)
-  "Possible hunt events")
+  '((hunter-enters-cave    (hunter-senses-chamber))
+
+    (hunter-senses-chamber (get-hunter-action
+                            hunter-hears-bats
+			    hunter-feels-draft
+			    hunter-smells-wumpus))
+
+    (get-hunter-action     (hunter-moves
+			    hunter-shoots
+			    player-quits-game))
+    
+    (hunter-smells-wumpus  (get-hunter-action))
+    (hunter-feels-draft    (get-hunter-action))
+    (hunter-hears-bats     (get-hunter-action))
+    
+    (player-quits-game     (hunt-ends))
+
+    (hunter-moves          (hunter-enters-chamber))
+    (hunter-enters-chamber (hunter-senses-chamber
+                            bat-snatches-hunter
+			    hunter-falls-in-pit
+			    wumpus-bothered))
+    (wumpus-bothered       (wumpus-rests
+			    wumpus-wanders
+			    wumpus-mauls-hunter))
+    (wumpus-mauls-hunter   (hunter-slain
+			    wumpus-rests
+			    wumpus-wanders))
+    (wumpus-wanders        (wumpus-moves))
+    (wumpus-moves          (wumpus-rests
+			    wumpus-mauls-hunter))
+    (wumpus-rests          (get-hunter-action))
+    (hunter-slain          (hunt-ends))
+    (hunter-falls-in-pit   (hunt-ends))
+    (bat-snatches-hunter   (hunter-enters-chamber))
+    
+    (hunter-shoots         (arrow-strikes-ground
+                            arrow-strikes-wumpus
+			    arrow-strikes-hunter
+                            arrow-scatters-bats
+			    arrow-falls-in-pit))
+    (arrow-falls-in-pit    (get-hunter-action))
+    (arrow-scatters-bats   (get-hunter-action
+			    bat-snatches-hunter))
+    (bat-snatches-hunter   (hunter-enters-chamber))
+    (arrow-strikes-hunter  (hunter-slain
+			    get-hunter-action))
+    (arrow-strikes-wumpus  (wumpus-slain
+			    wumpus-enraged))
+    (wumpus-enraged        (wumpus-seeks-shooter
+			    wumpus-wanders))
+    (wumpus-seeks-shooter  (wumpus-wanders
+			    wumpus-rests
+			    wumpus-mauls-hunter))
+    (arrow-strikes-ground  (wumpus-bothered))
+    (wumpus-slain          (hunt-ends))
+    
+    (hunt-ends             Nil)
+    
+    )
+  "Possible hunting events and consequences")
 
 (defparameter *hunt-endings*
   '(player-quits-hunt
     hunter-fell-in-pit
-    arrow-slays-hunter
-    arrow-slays-wumpus
-    wumpus-slays-hunter)
+    hunter-slain
+    wumpus-slain)
   "Possible ways for game to end")
 
 (defparameter *wumpus-health-setup* 1
@@ -159,7 +196,7 @@ Summary of symbols exported. See README.org for more information.
   (arrow-paths        ())
   (arrow-path-eval    *arrow-path-eval-setup*)
   (hunt-endings       *hunt-endings*)
-  (hunt-events        ())
+  (hunt-events        (mapcar #'first *hunt-events*))
   (hunt-history       ())
   )
 
@@ -217,12 +254,11 @@ Summary of symbols exported. See README.org for more information.
 ;;; TODO: make-cave-network, make-random-cave-network
 
 
-
 ;;; Chambers
 
 (defun count-chambers-in-cave (cave)
   "How many chambers are in cave"
-  (length (cave-passages cave)))
+  (length cave))
 
 (defun list-chambers-in-cave (cave)
   "A list of chambers in cave"
@@ -248,7 +284,7 @@ Summary of symbols exported. See README.org for more information.
 (defun chambers-nearby (chamber cave)
   "What chambers have tunnels connecting to here?"
   (assert (chamber-in-cave-p chamber cave))
-  (elt (cave-passages cave) chamber))
+  (elt cave chamber))
 
 (defun random-chamber-nearby (chamber cave)
   "Return a random chamber near a given chamber"
@@ -259,13 +295,29 @@ Summary of symbols exported. See README.org for more information.
 ;;; Passages and Paths
 ;;; A path is a list of locales connected by passages
 
-(defun latest-locale (path)
-  "Where does this path lead to?"
-  (first path))
+(defun chamber-in-path-p (chamber path)
+  "What position, if any, is this chamber in the path?"
+  (position chamber path :from-end T))
+
+;;; NOTE: All paths are expected to be in reverse order, with the
+;;; latest locale in path as first item in path.
+
+(defun truncate-path (chamber path)
+  "Return a path, truncated at the first instances of a given
+chamber."
+  (assert (chamber-in-path-p chamber path))
+  (let ((rpath (reverse path)))
+    (reverse
+     (subseq rpath 0
+	     (1+ (position chamber rpath))))))
 
 (defun passage-to-p (here there cave)
   "Does a tunnel connect this chamber with another?"
   (find there (chambers-nearby here cave)))
+
+(defun latest-locale (path)
+  "Where does this path lead to?"
+  (first path))
 
 (defun path-in-cave-p (path cave)
   "Is this a valid path through this cave?"
@@ -283,16 +335,66 @@ Summary of symbols exported. See README.org for more information.
 ;; the Wumpus path and arrow flights will be considered valid cave
 ;; paths.
 
-(defun chamber-in-path-p (chamber path)
-  "What position, if any, is this chamber in the path?"
-  (position chamber path))
+(defun correct-path-stop (path cave)
+  "Create a correct path, stopping as soon as an incorrect locale is
+reached."
+  (let ((rpath (reverse path)))
+    (loop
+       for (here there) on rpath
+       while (passage-to-p here there cave)
+       collect there into seq
+       finally (return
+		 (reverse (cons (first rpath) seq))))))
 
-;; NOTE: all paths are expected to be in reverse order, with the latest 
+(defun correct-path-steer (path cave)
+  "Create a correct path, replacing incorrect locales in path with
+randomly chosen correct ones."
+  (let ((rpath (reverse path)))
+    (loop
+       for (here there) on rpath
+       while there
+       collect
+	 (if (passage-to-p here there cave)
+	     there
+	     (random-chamber-nearby here cave))
+       into seq
+       finally (return
+		 (reverse (cons (first rpath) seq))))))
 
-;;; TODO:
+;;; FIXME: Should it exclude the passage it came from? (yes)
+
+;;; TODO: We need a correct path wander. This is what bats will do
+;;; when carrying a hunter off, pick a random location and carry him
+;;; there by random walk.
+
+;;; What should happen when a bat carrying a hunter passes through a
+;;; wumpus or pit chamber?
 
 ;; (defun make-random-path (&optional path-length)
 ;; What are the odds of a random path having any particular chamber at the end?
+
+;; (defun wander-to-there (here there cave)
+;;   "Create a valid path between two locales by wandering."
+;;   (error "FIXME: this function should exist, but is not defined"))
+
+;;; FIXME: how should this work? Does not have to be the shortest
+;;; path, but just a "reasonably" short path. Maybe find up to 6 of
+;;; the shortest paths to destination, pick one at random.
+
+;; (defun correct-path-seek (path cave)
+;;   "Create a correct path by seeking random route through cave between
+;;   locales."
+;;   (list *
+;; 	(first path)
+;; 	(loop
+;; 	   for (here there) on path
+;; 	   while there
+;; 	   collect
+;; 	     (if (passage-to-p here there cave)
+;; 		 there
+;; 		 (wander-to-there here there cave)))))
+
+
 
 
 ;;;; Setup hunt
@@ -316,9 +418,9 @@ Summary of symbols exported. See README.org for more information.
 		     :quiver-room       quiver-room
 		     :quiver-hold       (list quiver-hold)
 		     :arrow-path-eval   arrow-path-eval
-		     :hunt-events       (list 'hunter-enters-cave)))
+		     ))
 	 (random-chambers
-	  (hunt-shuffle (list-chambers-in-cave hunt))))
+	  (hunt-shuffle (list-chambers-in-cave (cave-passages hunt)))))
     (push (pop random-chambers) (wumpus-path hunt))
     (push (pop random-chambers) (hunter-path hunt))
     (loop
@@ -345,70 +447,70 @@ Summary of symbols exported. See README.org for more information.
 
 ;;;; The Wumpus
 
-(defun wumpus-health (wumpus)
+(defun wumpus-health (hunt)
   "What is the current health of the wumpus?"
-  (first (wumpus-life wumpus)))
+  (first (wumpus-life hunt)))
 
-(defun wumpus-alive-p (wumpus)
+(defun wumpus-alive-p (hunt)
   "Is the wumpus alive?"
-  (< 0 (wumpus-health wumpus)))
+  (< 0 (wumpus-health hunt)))
 
-(defun hurt-wumpus (wumpus &optional (hurt 1))
+(defun hurt-wumpus (hunt &optional (hurt 1))
   "Injure the wumpus"
   (assert (< 0 hurt))
   (with-accessors ((life wumpus-life)
-		   (health wumpus-health)) wumpus
+		   (health wumpus-health)) hunt
     (push (- health hurt) life)))
 
-(defun heal-wumpus (wumpus &optional (heal 1))
+(defun heal-wumpus (hunt &optional (heal 1))
   "Heal/grow the wumpus"
   (assert (< 0 heal))
   (with-accessors ((life wumpus-life)
-		   (health wumpus-health)) wumpus
+		   (health wumpus-health)) hunt
     (push (+ health heal) life)))
 
-(defun wumpus-locale (wumpus)
+(defun wumpus-locale (hunt)
   "Where is the wumpus?"
-  (latest-locale (wumpus-path wumpus)))
+  (latest-locale (wumpus-path hunt)))
 
-(defun send-wumpus (locale wumpus)
+(defun send-wumpus (locale hunt)
   "Move the wumpus to a new locale"
-  (assert (chamber-in-cave-p (wumpus-locale wumpus) wumpus))
-  (push locale (wumpus-path wumpus)))
+  (assert (chamber-in-cave-p (wumpus-locale hunt) (cave-passages hunt)))
+  (push locale (wumpus-path hunt)))
 
 
 ;;;; The Hunter
 
-(defun hunter-health (hunter)
+(defun hunter-health (hunt)
   "What is the current health of the hunter?"
-  (first (hunter-life hunter)))
+  (first (hunter-life hunt)))
 
-(defun hunter-alive-p (hunter)
+(defun hunter-alive-p (hunt)
   "Is the hunter alive?"
-  (< 0 (hunter-health hunter)))
+  (< 0 (hunter-health hunt)))
 
-(defun hurt-hunter (hunter &optional (hurt 1))
+(defun hurt-hunter (hunt &optional (hurt 1))
   "Injure the hunter"
   (assert (< 0 hurt))
   (with-accessors ((life hunter-life)
-		   (health hunter-health)) hunter
+		   (health hunter-health)) hunt
     (push (- health hurt) life)))
 
-(defun heal-hunter (hunter &optional (heal 1))
+(defun heal-hunter (hunt &optional (heal 1))
   "Heal/grow the hunter"
   (assert (< 0 heal))
   (with-accessors ((life hunter-life)
-		   (health hunter-health)) hunter
+		   (health hunter-health)) hunt
     (push (+ health heal) life)))
 
-(defun hunter-locale (hunter)
+(defun hunter-locale (hunt)
   "Where is the hunter?"
-  (latest-locale (hunter-path hunter)))
+  (latest-locale (hunter-path hunt)))
 
-(defun send-hunter (locale hunter)
+(defun send-hunter (locale hunt)
   "Send the hunter to a new locale"
-  (assert (chamber-in-cave-p (hunter-locale hunter) hunter))
-  (push locale (hunter-path hunter)))
+  (assert (chamber-in-cave-p (hunter-locale hunt) (cave-passages hunt)))
+  (push locale (hunter-path hunt)))
 
 
 ;;;; The Hunter's Quiver
@@ -461,21 +563,37 @@ Summary of symbols exported. See README.org for more information.
   "Where did the arrow seem to come from?"
   (second arrow-path))
 
+(defun make-new-shot (arrow-path hunt)
+  (push arrow-path (arrow-paths hunt)))
+
 (defun latest-shot (hunt)
   "What was the path of the last arrow shot?"
   (first (arrow-paths hunt)))
+
+(defun set-latest-shot (hunt arrow-path)
+  (setf (first (arrow-paths hunt)) arrow-path))
+
+(defsetf latest-shot set-latest-shot)
 
 (defun track-latest-shot (hunt)
   "From what room did the arrow come from?"
   (arrow-source (latest-shot hunt)))
 
+(defun stop-latest-shot (chamber hunt)
+  "Arrow stops in midflight."
+  (assert (chamber-in-path-p chamber (latest-shot hunt)))
+  (setf (latest-shot hunt) (truncate-path chamber (latest-shot hunt))))
+
+
+;;;; The Wumpus and Hunter in the Cave
+
 (defun chambers-near-wumpus (hunt)
   "What chambers are near the wumpus"
-  (chambers-nearby (wumpus-locale hunt) hunt))
+  (chambers-nearby (wumpus-locale hunt) (cave-passages hunt)))
 
 (defun chambers-near-hunter (hunt)
   "What chambers are near the hunter"
-  (chambers-nearby (hunter-locale hunt) hunt))
+  (chambers-nearby (hunter-locale hunt) (cave-passages hunt)))
 
 (defun wumpus-in-arrow-path-p (hunt)
   "Position of wumpus in the latest arrow path. An arrow path always has
@@ -503,13 +621,13 @@ a hunter location as its last value."
   "Is the hunter in a pit chamber?"
   (find (hunter-locale hunt) (cave-pits hunt)))
 
-(defun hunter-near-wumpus-p (cave)
+(defun hunter-near-wumpus-p (hunt)
   "Is the hunter near the wumpus' chamber?"
-  (find (hunter-locale cave) (chambers-near-wumpus cave)))
+  (find (hunter-locale hunt) (chambers-near-wumpus hunt)))
 
-(defun hunter-with-wumpus-p (cave)
+(defun hunter-with-wumpus-p (hunt)
   "Is the hunter in the wumpus' chamber?"
-  (= (hunter-locale cave) (wumpus-locale cave)))
+  (= (hunter-locale hunt) (wumpus-locale hunt)))
 
 
 ;;;; Hunt events
@@ -533,13 +651,18 @@ a hunter location as its last value."
   "Has one of hunt-ending events occurred?"
   (find (latest-event hunt) (hunt-endings hunt)))
 
+(defun player-quits-hunt (hunt)
+  "Player quits game"
+  (record-event 'player-quits-hunt hunt)
+  (events-since 'player-quits-hunt hunt))
+
 (defun wumpus-rests (hunt)
   "The wumpus rests"
   (record-event 'wumpus-rests hunt))
 
 (defun wumpus-moves (chamber hunt)
   "The wumpus moves to a nearby chamber"
-  (assert (passage-to-p (wumpus-locale hunt) chamber hunt))
+  (assert (passage-to-p (wumpus-locale hunt) chamber (cave-passages hunt)))
   (send-wumpus chamber hunt)
   (record-event 'wumpus-moves hunt))
 
@@ -547,7 +670,7 @@ a hunter location as its last value."
   "The wumpus moves randomly"
   (wumpus-moves
    (random-chamber-nearby
-    (wumpus-locale hunt) hunt) hunt))
+    (wumpus-locale hunt) (cave-passages hunt)) hunt))
 
 (defun wumpus-bothered (hunt)
   "The wumpus is bothered"
@@ -575,17 +698,19 @@ a hunter location as its last value."
     (hurt-hunter hunt)
     (record-event 'wumpus-mauls-hunter hunt)
     (unless (hunter-alive-p hunt)
-      (record-event 'wumpus-slays-hunter hunt)))
+      (record-event 'hunter-slain hunt)))
   (when (and (wumpus-alive-p hunt) (hunter-alive-p hunt))
     (wumpus-rests hunt)))
 
-(defun arrow-strikes-wumpus (wumpus)
+(defun arrow-strikes-wumpus (hunt)
   "An arrow strikes the wumpus"
-  (record-event 'arrow-strikes-wumpus wumpus)
-  (hurt-wumpus wumpus)
-  (cond ((wumpus-alive-p wumpus)
-	 (wake-wumpus 'arrow-strikes-wumpus wumpus))
-	(T (record-event 'arrow-slays-wumpus wumpus))))
+  (record-event 'arrow-strikes-wumpus hunt)
+  (stop-latest-shot (wumpus-locale hunt) hunt)
+  (hurt-wumpus hunt)
+  (cond ((wumpus-alive-p hunt)
+	 (wake-wumpus 'arrow-strikes-wumpus hunt))
+	(T
+	 (record-event 'wumpus-slain hunt))))
 
 (defun hunter-enters-chamber (hunt)
   "The hunter enters a chamber"
@@ -603,19 +728,11 @@ a hunter location as its last value."
 	  (setf hunter-moved Nil))
 	 ((hunter-with-bat-p hunt)
 	  (record-event 'bat-snatches-hunter hunt)
-	  (send-hunter (random-chamber hunt) hunt)
+	  (send-hunter (random-chamber (cave-passages hunt)) hunt)
 	  (setf hunter-moved T))
 	 (T
 	  (setf hunter-moved Nil)))
      until (null hunter-moved)))
-
-(defun hunter-moves (chamber hunt)
-  "The hunter moves to a nearby chamber"
-  (assert (passage-to-p chamber (hunter-locale hunt) hunt))
-  (record-event 'hunter-moves hunt)
-  (send-hunter chamber hunt)
-  (hunter-enters-chamber hunt)
-  (events-since 'hunter-moves hunt))
 
 (defun hunter-senses-chamber (hunt)
   "The hunter uses his/her senses to sense for danger in nearby
@@ -632,46 +749,63 @@ chambers"
       (T Nil))
     (events-since 'hunter-senses-chamber hunt)))
 
+(defun hunter-moves (chamber hunt)
+  "The hunter moves to a nearby chamber"
+  (assert (passage-to-p chamber (hunter-locale hunt) (cave-passages hunt)))
+  (record-event 'hunter-moves hunt)
+  (send-hunter chamber hunt)
+  (hunter-enters-chamber hunt)
+  (hunter-senses-chamber hunt)
+  (events-since 'hunter-moves hunt))
+
+(defun hunter-enters-cave (hunt)
+  "The hunter enters the cave."
+  (record-event 'hunter-enters-cave hunt)
+  (hunter-enters-chamber hunt)
+  (hunter-senses-chamber hunt)
+  (events-since 'hunter-enters-cave hunt))
+
 (defun arrow-strikes-hunter (hunt)
   "An arrow strikes the hunter"
   (record-event 'arrow-strikes-hunter hunt)
+  (stop-latest-shot (hunter-locale hunt) hunt)
   (hurt-hunter hunt)
   (unless (hunter-alive-p hunt)
-    (record-event 'arrow-slays-hunter hunt)))
+    (record-event 'hunter-slain hunt)))
 
-(defun eval-arrow-path-classic (arrow-path hunt)
+(defun eval-arrow-path-classic (hunt)
   "What happens when an arrow is shot through the cave - classic
 wumpus"
   (cond
     ((wumpus-in-arrow-path-p hunt)
-     (setf arrow-path
-	   (subseq arrow-path 0
-		   (1+ (wumpus-in-arrow-path-p hunt))))
      (arrow-strikes-wumpus hunt))
     ((hunter-in-arrow-path-p hunt)
-     (setf arrow-path
-	   (subseq arrow-path 0
-		   (1+ (hunter-in-arrow-path-p hunt))))
      (arrow-strikes-hunter hunt))
     (T
      (record-event 'arrow-strikes-ground hunt)
      (wake-wumpus 'arrow-strikes-ground hunt))))
 
-(defun eval-arrow-path-fancy (arrow-path hunt)
-  "What happens when an arrow isshot through the cave - fancier than
-the classic"
+;;; TODO: Bats may move if an arrow passes through their chamber. What
+;;; happens when bats move into a chamber with: a pit? A wumpus? A
+;;; hunter? Other bats?
+
+;; (defun arrow-scatters-bats (hunt)
+;;   "Bats may move if an arrow passes through their chamber."
+;;   (loop
+;;      for chamber in (cave-bats hunt)
+;;      do
+;;        (when (chamber-in-path-p chamber (latest-shot))
+;; 	 (loop
+
+(defun eval-arrow-path-fancy (hunt)
+  "What happens when an arrow is shot through the cave? Arrows can fall in
+pit, scare bats."
   (cond
     ((wumpus-in-arrow-path-p hunt)
-     (setf arrow-path
-	   (subseq arrow-path 0
-		   (1+ (wumpus-in-arrow-path-p hunt))))
      (arrow-strikes-wumpus hunt))
     ((hunter-in-arrow-path-p hunt)
-     (setf arrow-path
-	   (subseq arrow-path 0
-		   (1+ (hunter-in-arrow-path-p hunt))))
      (arrow-strikes-hunter hunt))
-    ((find (arrow-locale arrow-path) (cave-pits hunt))
+    ((find (arrow-locale (latest-shot hunt)) (cave-pits hunt))
      (record-event 'arrow-fell-in-pit hunt))
     (T
      (record-event 'arrow-strikes-ground hunt)
@@ -683,12 +817,13 @@ the classic"
 (defun hunter-shoots (arrow-path hunt)
   "The hunter shoots an arrow"
   (assert (not (quiver-void-p hunt)))
-  (assert (path-in-cave-p arrow-path hunt))
-  (push arrow-path (arrow-paths hunt))
+  (assert (path-in-cave-p arrow-path (cave-passages hunt)))
+;;  (push arrow-path (arrow-paths hunt))
   (record-event 'hunter-shoots-arrow hunt)
   (lose-arrow hunt)
+  (push (correct-path-steer arrow-path (cave-passages hunt)) (arrow-paths hunt))
   (funcall (symbol-function (arrow-path-eval hunt))
-	   arrow-path hunt)
+	   hunt)
   (events-since 'hunter-shoots-arrow hunt))
 
 
@@ -709,15 +844,16 @@ the classic"
 	       (list *wumpus-output-format* string)
 	       (list string)))))
 
-(defun send-wumpus-message (string &optional (stream *wumpus-out*))
-  "Output a wumpus message"
-  (format stream (make-wumpus-message string))
-  (force-output stream))
-
-(defun write-wumpus-line (string &optional (stream *wumpus-out*))
+(defun write-wumpus-line (string &key (stream *wumpus-out*))
   "Write messages to Wumpus player."
-  (write-line (make-wumpus-message string) stream)
-  (force-output stream))
+  (fresh-line stream)
+  (format stream (make-wumpus-message string))
+  (finish-output stream))
+
+(defun send-wumpus-message (&optional string (stream *wumpus-out*))
+  "Output a wumpus message"
+  (when string
+    (write-wumpus-line string :stream stream)))
 
 ;;; FIXME: reinventing the wheel
 
@@ -739,6 +875,8 @@ the classic"
 (defparameter *chamber-form-name-default* 'wumpus
   "The default chamber form name")
 
+;;; TODO: expose this option in game environment.
+
 (defun write-wumpus-chamber-to-string (chamber)
   "Write a wumpus chamber to a string"
   (format Nil "~D"
@@ -758,10 +896,12 @@ the classic"
 (defparameter *wumpus-io* *query-io*
   "What stream does wumpus write prompts to")
 
-(defun write-wumpus-prompt (prompt &optional (stream *wumpus-io*))
+(defun write-wumpus-prompt (prompt &key (stream *wumpus-io*) (fresh-line Nil))
   "Write a wumpus prompt."
+  (when fresh-line
+    (fresh-line stream))
   (princ (make-wumpus-message prompt) stream)
-  (force-output stream))
+  (finish-output stream))
 
 (defun read-wumpus-char (&optional (stream *wumpus-io*))
   "Read a single character from wumpus player input."
@@ -812,7 +952,7 @@ the classic"
 
 (defun instructions-p ()
   "Ask if the user wishes to see instructions"
-  (write-wumpus-prompt "Instructions (Y-N) ")
+  (write-wumpus-prompt "Instructions (Y-N) " :fresh-line T)
   (not (eq #\n (char-downcase (read-wumpus-char)))))
 
 (defun make-message-instructions ()
@@ -864,60 +1004,42 @@ the classic"
 ;; TODO: figure out how to make an output-pager that does this.
 ;; TODO: get wumpus 2's introduction
 
-(defparameter *wumpus-event-messages*
-  '(
-;;    (hunter-enters-chamber "")
-    (hunter-fell-in-pit    "YYYYIIIIEEEE . . . Fell in a pit")
-    (hunter-bumps-wumpus   "... Oops! Bumped a Wumpus!")
-    (bat-snatches-hunter   "ZAP--Super bat snatch! Elsewhereville for you!")
-    (arrow-strikes-wumpus  "Aha! You got the Wumpus!")
+
+;;;; The Game Environment
+
+(defparameter *game-event-messages-classic*
+  '((arrow-strikes-wumpus  "Aha! You got the Wumpus!")
     (arrow-strikes-hunter  "Ouch! Arrow got you!")
     (arrow-strikes-ground  "Missed")
-;;    (arrow-slays-wumpus    "")
-;;    (arrow-slays-hunter    "")
-;;    (hunter-moves          "")
-;;    (wumpus-moves          "")
-;;    (wumpus-wakes          "")
-;;    (wumpus-slays-hunter   "Tsk tsk tsk - Wumpus got you!")
+    (hunter-enters-chamber make-message-hunter-enters-chamber)
+    (hunter-fell-in-pit    "YYYYIIIIEEEE . . . Fell in a pit")
+    (hunter-bumps-wumpus   "... Oops! Bumped a Wumpus!")
+    (wumpus-mauls-hunter   "Tsk tsk tsk - Wumpus got you!")
+    (bat-snatches-hunter   "ZAP--Super bat snatch! Elsewhereville for you!")
     (hunter-smells-wumpus  "I smell a Wumpus!")
     (hunter-hears-bats     "Bats nearby!")
     (hunter-feels-draft    "I feel a draft"))
-  "Event messages in game")
+  "Event messages in game. Should be a string, function, or a symbol
+  of a function which takes the game for an argument and returns a string.")
 
-(defun get-event-message (event)
-  "Return the messge string for a hunt event"
-  (second (find event *wumpus-event-messages* :key 'first)))
+(defparameter *game-event-messages-wobh*
+  '((arrow-strikes-wumpus  "A roar of pain and rage fills the caverns.")
+    (arrow-strikes-hunter  "You cry out, as the arrow reenters the chamber and pierces you.")
+    (arrow-strikes-ground  "You hear a clattering sound in the distance")
+    (hunter-enters-chamber make-message-hunter-enters-chamber)
+    (hunter-fell-in-pit    "YYYYIIIIEEEE . . . Fell in a pit")
+    (hunter-bumps-wumpus   "You stumble into something large and warm.")
+    (wumpus-mauls-hunter   "The darkness fills with claws, teeth, and pain.")
+    (bat-snatches-hunter   "With a loud squeaking, you are lifted and carried off.")
+    (hunter-smells-wumpus  "A terrible stench causes you to gasp.")
+    (hunter-hears-bats     "You hear squeaking sounds nearby.")
+    (hunter-feels-draft    "You feel a draft."))
+  "Event messages in game. Should be a string, function, or a symbol
+  of a function which takes the game for an argument and returns a string.")
 
-(defun make-message-from-events (events)
-  "Return a message string from a sequence of events"
-  (with-output-to-string (message)
-    (loop
-       for event in (nreverse events)
-       do
-	 (let ((string (get-event-message event)))
-	   (when string
-	     (format message "~&~A" string))))))
 
-(defun make-message-ending (hunt)
-  "What does the game say when it ends?"
-  (assert (hunt-end-p hunt))
-  (cond ((eq (latest-event hunt) 'arrow-slays-wumpus)
-	 "Hee hee hee - The Wumpus'll get you next time!!")
-	(T
-	 "Ha ha ha - You lose!")))
 
-(defun make-message-turn (hunt)
-  "What does the game say at the beginning of a game turn?"
-  (unless (hunt-end-p hunt)
-    (with-output-to-string (message)
-      (format message "You are in room ~A~%~
-                     ~&Tunnels lead to ~{~A ~}"
-	      (write-wumpus-chamber-to-string (hunter-locale hunt))
-	      (write-wumpus-chambers (chambers-near-hunter hunt)))
-      (format message "~&~A"
-	      (make-message-from-events (hunter-senses-chamber hunt))))))
-
-(defparameter *wumpus-input-prompts*
+(defparameter *game-input-prompts-classic*
   '((make-arrow-path "Room # ")
     (same-arrow-path "Arrows aren't that crooked - try another room")
     (get-arrow-range "No. of rooms (~D-~D) ")
@@ -925,19 +1047,6 @@ the classic"
     (err-hunter-move "Not possible - ")
     (get-hunter-action "Shoot or move (S-M) "))
   "User input prompts in game")
-
-(defun get-prompt (prompt)
-  "Get a prompt from *wumpus-input-prompts*"
-  (second (find prompt *wumpus-input-prompts* :key 'first)))
-
-(defun set-prompt (prompt text)
-  "Set a prompt in *wumpus-input-prompts*"
-  (setf (second (find prompt *wumpus-input-prompts* :key 'first)) text))
-
-(defsetf get-prompt set-prompt)
-
-
-;;;; The Game Environment
 
 (defparameter *eval-hunter-action-default* 'eval-hunter-action-classic
   "The original game did not allow the player to quit the game.")
@@ -954,12 +1063,62 @@ the classic"
   "Original Wumpus did not ask if you wished to quit game, only if you
   wanted the same cave setup as before.")
 
+
 (defstruct (game (:conc-name game-))
+  (event-messages     *game-event-messages-classic*)
+  (input-prompts      *game-input-prompts-classic*)
   (eval-hunter-action *eval-hunter-action-default*)
   (eval-hunter-shot   *eval-hunter-shot-default*)
   (make-arrow-path    *make-arrow-path-default*)
   (use-play-again     *play-again-default*)
   (hunt Nil))
+
+(defun get-event-message (event game)
+  "Return the message string for a hunt event"
+  (let ((message
+	 (second (find event (game-event-messages game) :key 'first))))
+    (etypecase message
+      (null     Nil)
+      (string   message)
+      (symbol   (funcall (symbol-function message) game))
+      (function (funcall message game)))))
+
+(defun set-event-message (event game message)
+  "Set an event message in game-event-messages"
+  (if (find event (game-event-messages game) :key 'first)
+      (setf (second (find event (game-event-messages game) :key 'first))
+	    message)
+      (push (list event message) (game-event-messages game))))
+
+(defsetf get-event-message set-event-message)
+
+(defun make-message-from-events (events game)
+  "Return a message string from a sequence of events"
+  (with-output-to-string (message)
+    (loop
+       for event in (nreverse events)
+       do
+	 (let ((event-msg (get-event-message event game)))
+	   (unless (null event-msg)
+	     (write-wumpus-line event-msg :stream message))))))
+
+(defun get-input-prompt (prompter game)
+  "Get a prompt from *wumpus-input-prompts*"
+  (let ((prompt
+	 (second (find prompter (game-input-prompts game) :key 'first))))
+    (etypecase prompt
+      (string   prompt)
+      (symbol   (funcall (symbol-function prompt) game))
+      (function (funcall prompt game)))))
+
+(defun set-input-prompt (prompter game prompt)
+  "Set a prompt in game-input-prompts"
+  (if (find prompter (game-input-prompts game) :key 'first)
+      (setf (second (find prompter (game-input-prompts game) :key 'first)) prompt)
+      (push (list prompter prompt) (game-input-prompts game))))
+
+(defsetf get-input-prompt set-input-prompt)
+
 
 
 (defparameter *allow-quit* Nil
@@ -979,175 +1138,209 @@ the classic"
 		   (play-again            *play-again*)
 		   (cancel-shot-with-zero *cancel-shot-with-zero*)
 		   (show-near-chambers
-		    *show-near-chambers-in-make-arrow-path*))
-  "Setup game environment"
-  (let* ((env (make-game))
-	   (bow-range-minimum 1))
-      (setf (game-hunt env) (or hunt (setup-hunt)))
-      (when allow-quit
-	(setf (game-eval-hunter-action env) 'eval-hunter-action-with-quit)
-	(setf (get-prompt 'get-hunter-action) "Shoot, move, or quit (S-M-Q) "))
-      (when play-again
-	  (setf (game-use-play-again env) 'play-again-p))
-      (when show-near-chambers
-	(setf (game-make-arrow-path env) 'make-arrow-path-show-near-chambers))
-      (when cancel-shot-with-zero
-	(setf bow-range-minimum 0)
-	(setf (game-eval-hunter-shot env) 'eval-hunter-shot-cancel))
-      (setf (get-prompt 'get-arrow-range)
-	    (format Nil (get-prompt 'get-arrow-range)
-		    bow-range-minimum
-		    (bow-range-maximum (game-hunt env))))
-      env))
+		    *show-near-chambers-in-make-arrow-path*)
+		   (event-messages *game-event-messages-classic*))
+  "Setup game game environment"
+  (let* ((game (make-game :event-messages event-messages))
+	 (bow-range-minimum 1))
+    (setf (game-hunt game) (or hunt (setup-hunt)))
+    (when allow-quit
+      (setf (game-eval-hunter-action game) 'eval-hunter-action-with-quit)
+      (setf (get-input-prompt 'get-hunter-action game)
+	    "Shoot, move, or quit (S-M-Q) "))
+    (when play-again
+      (setf (game-use-play-again game) 'play-again-p))
+    (when show-near-chambers
+      (setf (game-make-arrow-path game) 'make-arrow-path-show-near-chambers))
+    (when cancel-shot-with-zero
+      (setf bow-range-minimum 0)
+	(setf (game-eval-hunter-shot game) 'eval-hunter-shot-cancel))
+    (setf (get-input-prompt 'get-arrow-range game)
+	  (format Nil (get-input-prompt 'get-arrow-range game)
+		  bow-range-minimum
+		  (bow-range-maximum (game-hunt game))))
+    game))
 
 (defun make-arrow-path-wumpus-dead-shot (hunt)
   "Make a an arrow path that leads to the wumpus"
-  (list (random-chamber-nearby (wumpus-locale hunt) hunt)
-	(wumpus-locale hunt)))
+  (list (wumpus-locale hunt)
+	(random-chamber-nearby (wumpus-locale hunt) (cave-passages hunt))))
 
 (defun make-arrow-path-hunter-dead-shot (hunt)
   "Make a an arrow path that leads to the hunter"
-  (list (random-chamber-nearby (hunter-locale hunt) hunt)
-	(hunter-locale hunt)))
+  (list (hunter-locale hunt)
+	(random-chamber-nearby (hunter-locale hunt) (cave-passages hunt))))
 
 ;;; TODO: write a path-finding function, for testing.
 
-(defun make-arrow-path-show-near-chambers (range hunt)
+(defun make-arrow-path-show-near-chambers (range game)
   "Make an arrow path with the prompt showing nearby chambers"
-  (assert (in-range-p range hunt))
-  (loop
-     with arrow-flight = (list (hunter-locale hunt))
-     with prompt = Nil
-     for i from 0 below range
-     do
-       (setf prompt
-	     (format Nil "Room # (~{~A~^, ~}) "
-		     (write-wumpus-chambers
-		      (chambers-nearby
-		       (first arrow-flight) hunt))))
-       (push
-	(with-wumpus-input (passage prompt
-				    :readf #'read-wumpus-chamber)
-	  (cond
-	    ((and (< 2 (length arrow-flight))
-		  (= passage (second arrow-flight)))
-	     (write-wumpus-line
-	      (get-prompt 'same-arrow-path))
-	     (setf passage Nil))
-	    ((passage-to-p (first arrow-flight) passage hunt)
-	     passage)
-	    (T
-	     (random-chamber-nearby (first arrow-flight) hunt))))
-	arrow-flight)
-     finally (return arrow-flight)))
+  (assert (in-range-p range (game-hunt game)))
+  (with-accessors ((hunt game-hunt)) game
+    (loop
+       with arrow-path = (list (hunter-locale hunt))
+       for i from 0 below range
+       do
+	 (with-wumpus-input (passage (get-input-prompt 'make-arrow-path game)
+				     :readf #'read-wumpus-chamber)
+	   (cond
+	     ((and (< 2 (length (latest-shot hunt)))
+		   (= passage (second (latest-shot hunt))))
+	      (write-wumpus-line
+	       (get-input-prompt 'same-arrow-path game))
+	      (setf passage Nil))
+	     (T
+	      (push passage arrow-path))))
+       finally (return (latest-shot hunt)))))
 
-(defun make-arrow-path-classic (range hunt)
+(defun make-arrow-path-classic (range game)
   "Make an arrow path"
-  (assert (in-range-p range hunt))
-  (loop
-     with arrow-flight = (list (hunter-locale hunt))
-     with prompt = (get-prompt 'make-arrow-path)
-     for i from 0 below range
-     do
-       (push
-	(with-wumpus-input (passage prompt
-				    :readf #'read-wumpus-chamber)
-	  (cond
-	    ((and (< 2 (length arrow-flight))
-		  (= passage (second arrow-flight)))
-	     (write-wumpus-line
-	      (get-prompt 'same-arrow-path))
-	     (setf passage Nil))
-	    ((passage-to-p (first arrow-flight) passage hunt)
-	     passage)
-	    (T
-	     (random-chamber-nearby (first arrow-flight) hunt))))
-	arrow-flight)
-	finally (return arrow-flight)))
+  (assert (in-range-p range (game-hunt game)))
+  (with-accessors ((hunt game-hunt)) game
+    (loop
+       with arrow-path = (list (hunter-locale hunt))
+       with prompt = (get-input-prompt 'make-arrow-path game)
+       for i from 0 below range
+       do
+	 (with-wumpus-input (passage prompt
+				     :readf #'read-wumpus-chamber)
+	   (cond
+	     ((and (< 2 (length arrow-path))
+		   (= passage (second arrow-path)))
+	      (write-wumpus-line
+	       (get-input-prompt 'same-arrow-path game))
+	      (setf passage Nil))
+	     (T
+	      (push passage arrow-path))))
+       finally (return arrow-path))))
 
-(defun eval-hunter-shot-cancel (env)
+(defun eval-hunter-shot-cancel (game)
   "What happens when the hunter shoots an arrow."
-  (with-wumpus-input (range (get-prompt 'get-arrow-range)
+  (with-wumpus-input (range (get-input-prompt 'get-arrow-range game)
 			    :readf #'read-wumpus-int)
     (cond
-      ((in-range-p range (game-hunt env))
-       (make-message-from-events
-	(hunter-shoots (funcall (symbol-function (game-make-arrow-path env))
-				range (game-hunt env))
-		       (game-hunt env))))
-      ((zerop range)
-       "")
+      ((in-range-p range (game-hunt game))
+       (hunter-shoots
+	(funcall (symbol-function (game-make-arrow-path game))
+		 range game)
+	(game-hunt game)))
+      ((zerop range) Nil)
       (T
        (setf range Nil)))))
 
-(defun eval-hunter-shot-classic (env)
+(defun eval-hunter-shot-classic (game)
   "What happens when the hunter shoots an arrow."
-  (with-wumpus-input (range (get-prompt 'get-arrow-range)
+  (with-wumpus-input (range (get-input-prompt 'get-arrow-range game)
 			    :readf #'read-wumpus-int)
     (cond
-      ((in-range-p range (game-hunt env))
-       (make-message-from-events
-	(hunter-shoots (funcall (symbol-function (game-make-arrow-path env))
-				range (game-hunt env))
-		       (game-hunt env))))
+      ((in-range-p range (game-hunt game))
+       (hunter-shoots
+	(funcall (symbol-function (game-make-arrow-path game))
+		 range game)
+	(game-hunt game)))
       (T
        (setf range Nil)))))
 
-(defun eval-hunter-move (hunt)
+(defun eval-hunter-move (game)
   "What happens when a hunters moves to a new chamber"
-  (with-wumpus-input (chamber (get-prompt 'get-hunter-move)
+  (with-wumpus-input (chamber (get-input-prompt 'get-hunter-move game)
 			      :readf #'read-wumpus-chamber)
-    (cond
-      ((passage-to-p (hunter-locale hunt) chamber hunt)
-       (make-message-from-events (hunter-moves chamber hunt)))
-      (T
-       (write-wumpus-prompt (get-prompt 'err-hunter-move))
-       (setf chamber Nil)))))
+    (with-accessors ((hunt game-hunt)) game
+      (cond
+	((passage-to-p (hunter-locale hunt) chamber (cave-passages hunt))
+	 (hunter-moves chamber hunt))
+	(T
+	 (write-wumpus-prompt (get-input-prompt 'err-hunter-move game))
+	 (setf chamber Nil))))))
 
 ;; FIXME move-hunter creates an error if the move is invalid,
 ;; possibly, I can use condition system.
 
-(defun eval-player-quit (hunt)
+(defun eval-player-quit (game)
   "Player quits game"
-  (record-event 'player-quits-hunt hunt)
-  (make-message-from-events
-   (events-since 'player-quits-hunt hunt)))
+  (with-wumpus-input (input "Do you wish to continue playing? "
+			    :readf #'read-wumpus-char)
+    (case (char-downcase input)
+      (#\y Nil)
+      (#\n (player-quits-hunt (game-hunt game)))
+      (T
+       (setf input Nil)))))
 
-(defun eval-hunter-action-classic (env)
+(defun eval-hunter-action-classic (game)
   "Shoot or move"
-  (with-wumpus-input (input (get-prompt 'get-hunter-action)
-			    :readf #'read-wumpus-char)
-    (case (char-downcase input)
-      (#\s (funcall (symbol-function (game-eval-hunter-shot env))
-		    env))
-      (#\m (eval-hunter-move (game-hunt env)))
-      (T
-       (setf input Nil)))))
+  (fresh-line *wumpus-io*)
+  (make-message-from-events 
+   (with-wumpus-input (input (get-input-prompt 'get-hunter-action game)
+			     :readf #'read-wumpus-char)
+     (case (char-downcase input)
+       (#\s (funcall (symbol-function (game-eval-hunter-shot game))
+		     game))
+       (#\m (eval-hunter-move game))
+       (T
+	(setf input Nil))))
+   game))
 
-(defun eval-hunter-action-with-quit (env)
+(defun eval-hunter-action-with-quit (game)
   "Shoot, move, or quit."
-  (with-wumpus-input (input (get-prompt 'get-hunter-action)
-			    :readf #'read-wumpus-char)
-    (case (char-downcase input)
-      (#\s (funcall (symbol-function (game-eval-hunter-shot env))
-		    env))
-      (#\m (eval-hunter-move (game-hunt env)))
-      (#\q (eval-player-quit (game-hunt env)))
-      (T
-       (setf input Nil)))))
+  (fresh-line *wumpus-io*)
+  (make-message-from-events 
+   (with-wumpus-input (input (get-input-prompt 'get-hunter-action game)
+			     :readf #'read-wumpus-char)
+     (case (char-downcase input)
+       (#\s (funcall (symbol-function (game-eval-hunter-shot game))
+		     game))
+       (#\m (eval-hunter-move game))
+       (#\q (eval-player-quit (game-hunt game)))
+       (T
+	(setf input Nil))))
+     game))
 
-(defun same-setup-p (hunt)
+(defun make-prompt-arrow-path-show-near-chambers (game)
+  "Make prompt for make-arrow-path which shows nearby chambers"
+  (with-accessors ((hunt game-hunt)) game
+    (format Nil "Room # (~{~A~^, ~}) "
+	    (write-wumpus-chambers
+	     (chambers-nearby
+	      (arrow-locale (latest-shot hunt)) (game-hunt game))))))
+
+(defun make-message-ending (game)
+  "What does the game say when it ends?"
+  (with-accessors ((hunt game-hunt)) game
+    (assert (hunt-end-p hunt))
+    (cond ((eq (latest-event hunt) 'arrow-slays-wumpus)
+	   "Hee hee hee - The Wumpus'll get you next time!!")
+	  (T
+	   "Ha ha ha - You lose!"))))
+
+(defun make-message-hunter-enters-chamber (game)
+  "What does the game say at the beginning of a game turn?"
+  (with-accessors ((hunt game-hunt)) game
+    (unless (hunt-end-p hunt)
+      (with-output-to-string (message)
+	(format message "You are in room ~A~%~
+                       ~&Tunnels lead to ~{~A ~}"
+		(write-wumpus-chamber-to-string (hunter-locale hunt))
+		(write-wumpus-chambers (chambers-near-hunter hunt)))))))
+
+(defun same-setup-p (game)
   "Play again with the same cave as last time?"
-  (write-wumpus-prompt "Same setup (Y-N) ")
-  (if (eq #\y (char-downcase (read-wumpus-char)))
-      (reset-hunt hunt)
-      (setup-hunt)))
+  (write-wumpus-prompt "Same setup (Y-N) " :fresh-line T)
+  (cond ((eq #\y (char-downcase (read-wumpus-char)))
+	 (setf (game-hunt game) (reset-hunt (game-hunt game)))
+	 game)
+	(T
+	 (setup-game))))
 
-(defun play-again-p (hunt)
+(defun play-again-p (game)
   "Play again?"
-  (write-wumpus-prompt "Play again (Y-N) ")
+  (write-wumpus-prompt "Play again (Y-N) " :fresh-line T)
   (when (eq #\y (char-downcase (read-wumpus-char)))
-    (same-setup-p hunt)))
+    (same-setup-p game)))
+
+(defun begin-hunt (game)
+  "The hunt begins!"
+  (make-message-from-events
+   (hunter-enters-cave (game-hunt game)) game))
 
 (defun main (&key (game Nil))
   "Hunt the Wumpus"
@@ -1158,21 +1351,20 @@ the classic"
     (loop
        with play = T
        do
+	 (write-wumpus-line (begin-hunt env))
 	 (loop
 	    do
-	      (write-wumpus-line
-	       (make-message-turn (game-hunt env)))
 	      (write-wumpus-line
 	       (funcall (game-eval-hunter-action env) env))
 	    until (hunt-end-p (game-hunt env))
 	    finally (write-wumpus-line
-		     (make-message-ending (game-hunt env))))
+		     (make-message-ending env)))
 	 (setf play
 	       (funcall
 		(symbol-function (game-use-play-again env))
-		(game-hunt env)))
+		env))
 	 (when play
-	   (setf (game-hunt env) play))
+	   (setf env play))
        until (null play)
        finally (return env))))
 
@@ -1187,7 +1379,7 @@ the classic"
 ;; (:export "*TEST-RANDOM-STATE*")
 ;; (:export "*TEST-HUNT*" "SETUP-TEST-HUNT")
 ;; (:export "*TEST-GAME*" "SETUP-TEST-GAME")
-;; (:export "*TEST-MAIND)
+;; (:export "*TEST-MAIN")
 
 
 (defparameter *test-random-state* (make-random-state T)
@@ -1208,7 +1400,7 @@ the classic"
   (setf *hunt-random-state* (make-random-state *test-random-state*))
   (setf *test-hunt*
 	(setup-hunt
-	 :cave-name         (get-cave-network cave-name)
+	 :cave-name         cave-name
 	 :wumpus-health     wumpus-health
 	 :wumpus-hurt       wumpus-hurt
 	 :hunter-health     hunter-health
@@ -1235,7 +1427,7 @@ the classic"
 		    :cancel-shot-with-zero cancel-shot-with-zero
 		    :show-near-chambers    show-near-chambers)))
 
-(defun setup-wumpus-wobh ()
+(defun setup-game-wobh ()
   "Setup game with my favorite new settings."
   (setup-game
    :hunt (setup-hunt
@@ -1244,6 +1436,7 @@ the classic"
 	  :wumpus-hurt 'wumpus-enraged
 	  :hunter-health 2
 	  :arrow-path-eval 'eval-arrow-path-fancy)
+   :event-messages *game-event-messages-wobh*
    :allow-quit T
    :play-again T
    :cancel-shot-with-zero T))
