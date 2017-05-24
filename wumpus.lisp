@@ -157,7 +157,7 @@ Summary of symbols exported. See README.org for more information.
   "What the Wumpus does when injured")
 
 (defparameter *hunter-health-setup* 1
-  "The number of arrow-strikes required to slay the Hunter")
+  "The number of Wumpus-strikes required to slay the Hunter")
 
 (defparameter *quiver-hold-setup* 5
   "The number of arrows the hunter starts off with")
