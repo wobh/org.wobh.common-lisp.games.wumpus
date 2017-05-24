@@ -13,17 +13,17 @@
 
 ;;;; see README.org
 
-(defpackage "ORG.WOBH.WUMPUS"
-  (:nicknames "WUMPUS" "HUNT")
-  (:use "COMMON-LISP")
-  (:export "*CAVE-NETWORKS*" "GET-CAVE-NETWORK")
-  (:export "DODECAHEDRON" "DODECAHEDRON-CIRCUIT" "MOBIUS-STRIP" "STRING-OF-BEADS"
-	   "HEX-NET-ON-TORUS" "DENDRITE-WITH-DEGENERACIES" "ONE-WAY-LATTICE")
+(defpackage #:org.wobh.wumpus
+  (:nicknames #:wumpus #:hunt)
+  (:use #:common-lisp)
+  (:export #:*cave-networks* #:get-cave-network)
+  (:export #:dodecahedron #:dodecahedron-circuit #:mobius-strip #:string-of-beads
+	   #:hex-net-on-torus #:dendrite-with-degeneracies #:one-way-lattice)
   ;; Cave names
-  (:export "MAKE-HUNT"
-	   "SETUP-HUNT" "RESET-HUNT")
-  (:export "SETUP-GAME")
-  (:export "MAIN")
+  (:export #:make-hunt
+	   #:setup-hunt #:reset-hunt)
+  (:export #:setup-game)
+  (:export #:main)
   (:documentation "HUNT THE WUMPUS
 
 * Symbols exported
@@ -53,7 +53,7 @@ Summary of symbols exported. See README.org for more information.
 - one-way-lattice"))
 
 
-(in-package "ORG.WOBH.WUMPUS")
+(in-package #:org.wobh.wumpus)
 
 
 ;;;; Randomness
