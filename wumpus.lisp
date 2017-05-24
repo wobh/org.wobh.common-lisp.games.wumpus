@@ -1413,12 +1413,12 @@ pit, scare bats."
 
 (defparameter *test-game* Nil)
 
-(defun setup-test-game  (&key
-			 (hunt                  (or *test-hunt* (setup-test-hunt)))
-			 (allow-quit            *allow-quit*)
-			 (play-again            *play-again*)
-			 (cancel-shot-with-zero *cancel-shot-with-zero*)
-			 (show-near-chambers    *show-near-chambers-in-make-arrow-path*))
+(defun setup-test-game (&key
+                          (hunt                  (or *test-hunt* (setup-test-hunt)))
+                          (allow-quit            *allow-quit*)
+                          (play-again            *play-again*)
+                          (cancel-shot-with-zero *cancel-shot-with-zero*)
+                          (show-near-chambers    *show-near-chambers-in-make-arrow-path*))
   "Set *test-game* with hunt (or test-hunt)"
   (setf *test-game*
 	(setup-game :hunt                  hunt
