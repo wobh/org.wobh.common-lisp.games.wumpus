@@ -1024,7 +1024,7 @@ pit, scare bats."
 
 (defparameter *game-event-messages-wobh*
   '((arrow-strikes-wumpus  "A roar of pain and rage fills the caverns.")
-    (arrow-strikes-hunter  "You cry out, as the arrow reenters the chamber and pierces you.")
+    (arrow-strikes-hunter  "You cry out in agony as the arrow reenters the chamber and pierces you.")
     (arrow-strikes-ground  "You hear a clattering sound in the distance")
     (hunter-enters-chamber make-message-hunter-enters-chamber)
     (hunter-fell-in-pit    "YYYYIIIIEEEE . . . Fell in a pit")
