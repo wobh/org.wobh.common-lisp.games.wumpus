@@ -171,7 +171,7 @@ Summary of symbols exported. See README.org for more information.
 (defparameter *arrow-path-eval-setup* 'eval-arrow-path-classic
   "What happens when an arrow is shot through the caves")
 
-(defparameter *cave-name-default* 'dodecahedron
+(defparameter *cave-name-default* :dodecahedron
   "The default cave system.")
 
 (defparameter *bats-total* 2
@@ -206,50 +206,46 @@ Summary of symbols exported. See README.org for more information.
 ;;; Cave passages
 
 (defparameter *cave-networks*
-  '((dodecahedron
-     (( 1  4  7) ( 0  2  9) ( 1  3 11) ( 2  4 13) ( 0  3  5)
-      ( 4  6 14) ( 5  7 16) ( 0  6  8) ( 7  9 17) ( 1  8 10)
-      ( 9 11 18) ( 2 10 12) (11 13 19) ( 3 12 14) ( 5 13 15)
-      (14 16 19) ( 6 15 17) ( 8 16 18) (10 17 19) (12 15 18)))
-    (dodecahedron-circuit
-     (( 1 19  7) ( 2  0  5) ( 3  1 18) ( 4  2 16) ( 5  3 14)
-      ( 6  4  1) ( 7  5 13) ( 8  6  0) ( 9  7 12) (10  8 19)
-      (11  9 17) (12 10 15) (13 11  8) (14 12  6) (15 13  4)
-      (16 14 11) (17 15  3) (18 16 10) (19 17  2) ( 0 18  9)))
-    (mobius-strip
-     ((19  1  2) (18  0  3) ( 0  3  4) ( 1  2  5) ( 2  5  6)
-      ( 3  4  7) ( 4  7  8) ( 5  6  9) ( 6  9 10) ( 7  8 11)
-      ( 8 11 12) ( 9 10 13) (10 13 14) (11 12 15) (12 15 16)
-      (13 14 17) (14 17 18) (15 16 19) ( 1 16 19) ( 0 17 18)))
-    (string-of-beads
-     (( 1  2 19) ( 0  2  3) ( 0  1  3) ( 1  2  4) ( 3  5  6)
-      ( 4  6  7) ( 4  5  7) ( 5  6  8) ( 7  9 10) ( 8 10 11)
-      ( 8  9 11) ( 9 10 12) (11 13 14) (12 14 15) (12 13 15)
-      (13 14 16) (15 17 18) (16 18 19) (16 17 19) ( 0 17 18)))
-    (hex-net-on-torus
-     (( 5  9 15) ( 5  6 16) ( 6  7 17) ( 7  8 18) ( 8  9 19)
-      ( 0  1 14) ( 1  2 10) ( 2  3 11) ( 3  4 12) ( 4  0 13)
-      ( 6 15 19) ( 7 15 16) ( 8 16 17) ( 9 17 18) ( 5 18 19)
-      ( 0 10 11) ( 1 11 12) ( 2 12 13) ( 3 13 14) ( 4 10 14)))
-    (dendrite-with-degeneracies
-     (( 0  0  4) ( 1  1  4) ( 2  2  5) ( 3  3  5) ( 0  1  6)
-      ( 2  3  6) ( 4  5  9) ( 7  8  8) ( 7  7  9) ( 6  8 10)
-      ( 9 12 13) (11 12 12) (10 17 11) (10 14 15) (13 16 17)
-      (13 18 19) (14 16 15) (14 17 17) (13 18 18) (15 19 19)))
-    (one-way-lattice
-     (( 4  3  7) ( 0  4  5) ( 1  5  6) ( 2  6  7) ( 7  8 11)
-      ( 4  8  9) ( 5  9 10) ( 6 10 11) (11 12 15) ( 8 12 13)
-      ( 9 13 14) (10 14 15) (15 16 19) (12 16 17) (13 17 18)
-      (14 18 19) ( 0  3 19) ( 0  1 16) ( 1  2 17) ( 2  3 18))))
+  '((:dodecahedron
+     ( 1  4  7) ( 0  2  9) ( 1  3 11) ( 2  4 13) ( 0  3  5)
+     ( 4  6 14) ( 5  7 16) ( 0  6  8) ( 7  9 17) ( 1  8 10)
+     ( 9 11 18) ( 2 10 12) (11 13 19) ( 3 12 14) ( 5 13 15)
+     (14 16 19) ( 6 15 17) ( 8 16 18) (10 17 19) (12 15 18))
+    (:dodecahedron-circuit
+     ( 1 19  7) ( 2  0  5) ( 3  1 18) ( 4  2 16) ( 5  3 14)
+     ( 6  4  1) ( 7  5 13) ( 8  6  0) ( 9  7 12) (10  8 19)
+     (11  9 17) (12 10 15) (13 11  8) (14 12  6) (15 13  4)
+     (16 14 11) (17 15  3) (18 16 10) (19 17  2) ( 0 18  9))
+    (:mobius-strip
+     (19  1  2) (18  0  3) ( 0  3  4) ( 1  2  5) ( 2  5  6)
+     ( 3  4  7) ( 4  7  8) ( 5  6  9) ( 6  9 10) ( 7  8 11)
+     ( 8 11 12) ( 9 10 13) (10 13 14) (11 12 15) (12 15 16)
+     (13 14 17) (14 17 18) (15 16 19) ( 1 16 19) ( 0 17 18))
+    (:string-of-beads
+     ( 1  2 19) ( 0  2  3) ( 0  1  3) ( 1  2  4) ( 3  5  6)
+     ( 4  6  7) ( 4  5  7) ( 5  6  8) ( 7  9 10) ( 8 10 11)
+     ( 8  9 11) ( 9 10 12) (11 13 14) (12 14 15) (12 13 15)
+     (13 14 16) (15 17 18) (16 18 19) (16 17 19) ( 0 17 18))
+    (:hex-net-on-torus
+     ( 5  9 15) ( 5  6 16) ( 6  7 17) ( 7  8 18) ( 8  9 19)
+     ( 0  1 14) ( 1  2 10) ( 2  3 11) ( 3  4 12) ( 4  0 13)
+     ( 6 15 19) ( 7 15 16) ( 8 16 17) ( 9 17 18) ( 5 18 19)
+     ( 0 10 11) ( 1 11 12) ( 2 12 13) ( 3 13 14) ( 4 10 14))
+    (:dendrite-with-degeneracies
+     ( 0  0  4) ( 1  1  4) ( 2  2  5) ( 3  3  5) ( 0  1  6)
+     ( 2  3  6) ( 4  5  9) ( 7  8  8) ( 7  7  9) ( 6  8 10)
+     ( 9 12 13) (11 12 12) (10 17 11) (10 14 15) (13 16 17)
+     (13 18 19) (14 16 15) (14 17 17) (13 18 18) (15 19 19))
+    (:one-way-lattice
+     ( 4  3  7) ( 0  4  5) ( 1  5  6) ( 2  6  7) ( 7  8 11)
+     ( 4  8  9) ( 5  9 10) ( 6 10 11) (11 12 15) ( 8 12 13)
+     ( 9 13 14) (10 14 15) (15 16 19) (12 16 17) (13 17 18)
+     (14 18 19) ( 0  3 19) ( 0  1 16) ( 1  2 17) ( 2  3 18)))
   "A cave is a network of chambers connected by passages.")
 
 (defun get-cave-network (cave-name)
   "Find passage network associated with cave-name"
-  (assert (find cave-name *cave-networks* :key 'first))
-  (second (find cave-name *cave-networks* :key 'first)))
-
-;;; FIXME: I think I have to either use keywords for cave names, or
-;;; export all these cave names to make them useful externally.
+  (rest (find cave-name *cave-networks* :key 'first)))
 
 ;;; TODO: make-cave-network, make-random-cave-network
 
