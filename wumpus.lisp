@@ -1307,7 +1307,7 @@ pit, scare bats."
   "What does the game say when it ends?"
   (with-accessors ((hunt game-hunt)) game
     (assert (hunt-end-p hunt))
-    (cond ((eq (latest-event hunt) 'arrow-slays-wumpus)
+    (cond ((eq (latest-event hunt) 'wumpus-slain)
 	   "Hee hee hee - The Wumpus'll get you next time!!")
 	  (T
 	   "Ha ha ha - You lose!"))))
