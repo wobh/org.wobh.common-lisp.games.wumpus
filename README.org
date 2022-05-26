@@ -1,20 +1,47 @@
-#+TITLE:     Wumpus for Common Lisp
-#+AUTHOR:    William Clifford
-#+EMAIL:     wobh@yahoo.com
-#+DATE:      2012-10-27 Sat
-#+DESCRIPTION: documentation and plan for a Common Lisp Wumpus Game
-#+KEYWORDS: 
-#+LANGUAGE:  en
-#+OPTIONS:   H:3 num:t toc:t \n:nil @:t ::t |:t ^:t -:t f:t *:t <:t
-#+OPTIONS:   TeX:t LaTeX:t skip:nil d:nil todo:t pri:nil tags:not-in-toc
-#+INFOJS_OPT: view:nil toc:nil ltoc:t mouse:underline buttons:0 path:http://orgmode.org/org-info.js
-#+EXPORT_SELECT_TAGS: export
-#+EXPORT_EXCLUDE_TAGS: noexport
-#+LINK_UP:   
-#+LINK_HOME: 
-#+XSLT:
+#+Title: Hunt The Wumpus README
+#+date: <2012-10-27 Sat>
+#+author: William Clifford
+#+email: will@wobh.org
+#+language: en
+#+select_tags: export
+#+exclude_tags: noexport
 
 * Introduction
+
+A Common Lisp implementation of Gregory Yob's classic game.
+
+* Purpose
+
+This is here shared with the idea that some might find it useful for
+personal experiments and toys--that's all I'm using it for. It might
+also be cautionarily if not pedagogically useful. All that said, it
+should not be expected to have any desireable characteristics or be
+useful in any way.
+
+Non-personal use (for example, commercial) is forbidden.
+
+Non-casual personal use is strongly discouraged.
+
+* Instructions
+
+To use:
+
+1. Clone repository
+2. Run ~make install~ this will install it into
+   ~${XDG_DATA_HOME}/common-lisp/source/org.wobh.common-lisp.games.wumpus~
+3. in REPL ~(require "asdf")~ (as needed)
+4. ~(require :org.wobh.common-lisp.games.wumpus)~
+
+The test package is simply Lisp assertions and loads with the rest of
+the system. If the system loads without errors all the tests passed.
+
+The package defines a nickname of ~wumpus~ for convenience.
+
+Once required, you can play wumpus in the REPL with
+~(wumpus:play)~ or enter the playtest environment with ~(in-package
+#:wumpus-user)~.
+
+* Features and Suggestions
 
 Gregory Yob made the following suggestions to expand his original
 _Hunt the Wumpus_ game.
@@ -64,81 +91,80 @@ The Wumpus might track the Hunter through the caves.
 
 * Exported functions and their parameters
 
-** MAIN
+** ~MAIN~
 
 Launches game, defaults to classic Hunt the Wumpus settings.
 
-*** :GAME
+*** ~:GAME~
 
 Option to provide custom Hunt the Wumpus game environment
 
-** SETUP-GAME
+** ~SETUP-GAME~
 
 Creates Hunt the Wumpus game environment
 
-*** :HUNT
+*** ~:HUNT~
 
 Option for providing a custom hunting setting.
 
-*** :ALLOW-QUIT
+*** ~:ALLOW-QUIT~
 
 When true, allows player to quit game at action prompt.
 
-*** :CANCEL-SHOT-WITH-ZERO
+*** ~:CANCEL-SHOT-WITH-ZERO~
 
 When true, allows hunter to cancel shot by entering '0' at shot range
 prompt.
 
-*** :SHOW-NEAR-CHAMBERS
+*** ~:SHOW-NEAR-CHAMBERS~
 
 When true, shows the player the nearby chambers to the last room in
 arrow path. This makes accurately steering an arrow shot path a lot
 easier.
 
+** ~SETUP-HUNT~
 
-** SETUP-HUNT
-
-*** :CAVE-NAME
+*** ~:CAVE-NAME~
 
 Option to provide a cave name for custom cave. The cave names
 
-- DODECAHEDRON :: Classic Wumpus cave. Default cave.
-- DODECAHEDRON-CIRCUIT :: dodecahedron with Hamiltonian circuit
-                          passages
-- MOBIUS-STRIP :: From Wumpus II
-- STRING-OF-BEADS :: From Wumpus II
-- HEX-NET-ON-TORUS :: From Wumpus II
-- DENDRITE-WITH-DEGENERACIES :: From Wumpus II
-- ONE-WAY-LATTICE :: From Wumpus II
+- ~DODECAHEDRON~ :: Classic Wumpus cave. Default cave.
+- ~DODECAHEDRON-CIRCUIT~ :: dodecahedron with Hamiltonian circuit
+                             passages
+- ~MOBIUS-STRIP~ :: From Wumpus II
+- ~STRING-OF-BEADS~ :: From Wumpus II
+- ~HEX-NET-ON-TORUS~ :: From Wumpus II
+- ~DENDRITE-WITH-DEGENERACIES~ :: From Wumpus II
+- ~ONE-WAY-LATTICE~ :: From Wumpus II
 
-*** :WUMPUS-HEALTH
+*** ~:WUMPUS-HEALTH~
 
 Option for allowing the Wumpus to take more than one arrow
 hit. Default, 1.
 
-*** :WUMPUS-HURT
+*** ~:WUMPUS-HURT~
 
 Symbol of function which governs what the wumpus does when struck by an arrow and not slain.
 
-- WUMPUS-BOTHERED :: will randomly move or stay
-- WUMPUS-ENRAGED :: will try to follow the arrow into the room it came from, and beyond if no one found
+- ~WUMPUS-BOTHERED~ :: will randomly move or stay
+- ~WUMPUS-ENRAGED~ :: will try to follow the arrow into the room it came from, and beyond if no one found
 
-*** :HUNTER-HEALTH
+*** ~:HUNTER-HEALTH~
 
 Option for allowing the Hunter to survive more than one wumpus
 mauling. Default 1.
 
-*** :BOW-RANGE-MAXIMUM
+*** ~:BOW-RANGE-MAXIMUM~
 
 Option for setting the maximum range of the Hunter's bow. Default
 5.
 
-*** :QUIVER-ROOM
+*** ~:QUIVER-ROOM~
 
 Option for setting the maximum number of arrows the Hunter's quiver
 can hold. Default 5.
 
-*** :QUIVER-HOLD
+*** ~:QUIVER-HOLD~
 
 Option for setting the number of arrows the Hunter's quiver starts off
 with. Default 5.
@@ -150,3 +176,10 @@ with. Default 5.
 <<2>>Yob, Gregory, _Wumpus 2_, _The Best Of Creative Computing Volume 2_, 1977, pgs 244-246, http://www.atariarchives.org/bcc2/showpage.php?page=244
 
 <<3>> _Baf's guide to the IF Archive_, http://www.wurb.com/if/game/442
+
+* COMMENT org settings
+#+options: ':nil *:t -:t ::t <:t H:6 \n:nil ^:t arch:headline
+#+options: author:t broken-links:nil c:nil creator:nil
+#+options: d:(not "LOGBOOK") date:t e:t email:nil f:t inline:t num:nil
+#+options: p:nil pri:nil prop:nil stat:t tags:t tasks:t tex:t
+#+options: timestamp:t title:t toc:nil todo:t |:t
